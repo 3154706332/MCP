@@ -259,7 +259,7 @@ class McpBridgeRegistry(private val context: Context, private val settings: Sett
         val config: BridgeConfig,
         private val settings: SettingsStore
     ) {
-        private val client = McpClient(
+        internal val client = McpClient(
             baseUrl = config.url,
             token = config.token,
             connectTimeoutSec = config.connectTimeoutSec,
