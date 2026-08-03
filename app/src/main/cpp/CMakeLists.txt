@@ -81,19 +81,31 @@ add_library(blutter_bridge SHARED blutter_bridge.cpp)
 target_link_libraries(blutter_bridge PRIVATE dl log)
 
 set(XANSO_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../../../third_party/xAnSo-src")
-add_library(xanso_native SHARED
-    xanso_jni.cpp
-    ${XANSO_ROOT}/log.cpp
-    ${XANSO_ROOT}/util/util.cpp
-    ${XANSO_ROOT}/Core/dyn_item.cpp
-    ${XANSO_ROOT}/Core/dyn_section.cpp
-    ${XANSO_ROOT}/Core/elf_header.cpp
-    ${XANSO_ROOT}/Core/elf_section.cpp
-    ${XANSO_ROOT}/Core/elf_segment.cpp
-    ${XANSO_ROOT}/fix/section_fix.cpp
-)
-target_compile_options(xanso_native PRIVATE "-iquote${XANSO_ROOT}")
-target_link_libraries(xanso_native PRIVATE log)
+
+# xAnSo source uses MSVC-only CRT functions (_itoa_s, strsafe.h) unavailable
+# in Android NDK's clang toolchain. Only build on Windows host where MSVC is
+# available; otherwise skip and let Kotlin XAnSoEngine gracefully fall back
+# to LiefEngine.fixSections() when xanso_native.so is absent.
+if(CMAKE_HOST_WIN32 AND EXISTS "${XANSO_ROOT}/fix/section_fix.h")
+    message(STATUS "xAnSo: building native library for ${ANDROID_ABI}")
+    add_library(xanso_native SHARED
+        xanso_jni.cpp
+        ${XANSO_ROOT}/log.cpp
+        ${XANSO_ROOT}/util/util.cpp
+        ${XANSO_ROOT}/Core/dyn_item.cpp
+        ${XANSO_ROOT}/Core/dyn_section.cpp
+        ${XANSO_ROOT}/Core/elf_header.cpp
+        ${XANSO_ROOT}/Core/elf_section.cpp
+        ${XANSO_ROOT}/Core/elf_segment.cpp
+        ${XANSO_ROOT}/fix/section_fix.cpp
+    )
+    target_compile_options(xanso_native PRIVATE "-iquote${XANSO_ROOT}")
+    target_link_libraries(xanso_native PRIVATE log)
+elseif(EXISTS "${XANSO_ROOT}/fix/section_fix.h")
+    message(STATUS "xAnSo: native library SKIPPED (MSVC-only source, host=${CMAKE_HOST_SYSTEM_NAME}). Kotlin fallback active.")
+else()
+    message(STATUS "xAnSo: source not found — skipping native library.")
+endif()
 
 # --- LIEF include dirs and link ---
 if(LIEF_AVAILABLE)

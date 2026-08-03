@@ -825,10 +825,11 @@ object ToolCatalog {
             "System control: tunnel start/stop/status, APK MCP bridge status/probe/ping, overall system status.",
             "system", ToolClass.META,
         ) { objectSchema(props {
-            "action".oneOf("status | tunnel_start | tunnel_stop | tunnel_status | tunnel_stats | apk_status | apk_probe | apk_ping", "status", "tunnel_start", "tunnel_stop", "tunnel_status", "tunnel_stats", "apk_status", "apk_probe", "apk_ping")
+            "action".oneOf("status | tunnel_start | tunnel_stop | tunnel_status | tunnel_stats | apk_status | apk_probe | apk_ping | bridge_status | bridge_probe | bridge_ping", "status", "tunnel_start", "tunnel_stop", "tunnel_status", "tunnel_stats", "apk_status", "apk_probe", "apk_ping", "bridge_status", "bridge_probe", "bridge_ping")
             "mode".oneOf("Tunnel mode: quick | named (tunnel_start)", "quick", "named")
             "targetPort" int "Tunnel target port (tunnel_start)"
-            "probe" bool "Force re-probe (apk_status/status)"
+            "probe" bool "Force re-probe (apk_status/status/bridge_status)"
+            "bridgeId" str "Bridge ID to probe/ping (bridge_probe/bridge_ping)"
         }) }
         override fun handle(ctx: ToolContext, args: JSONObject): JSONObject {
             val hooked = ctx as? HookedContext ?: return JSONObject().put("error", "System hooks not available")
@@ -838,9 +839,12 @@ object ToolCatalog {
                 "tunnel_stop" -> hooked.tunnelStopHook()
                 "tunnel_status" -> hooked.tunnelStatusHook()
                 "tunnel_stats" -> hooked.tunnelStatsHook(args.bool("probe", false))
-                "apk_status" -> hooked.apkStatusHook(args.bool("probe", false))
-                "apk_probe" -> hooked.apkProbeHook()
-                "apk_ping" -> hooked.apkPingHook()
+                "apk_status" -> hooked.bridgeStatusHook(args.bool("probe", false))
+                "apk_probe" -> hooked.bridgeProbeHook(args.str("bridgeId", ""))
+                "apk_ping" -> hooked.bridgePingHook(args.str("bridgeId", ""))
+                "bridge_status" -> hooked.bridgeStatusHook(args.bool("probe", false))
+                "bridge_probe" -> hooked.bridgeProbeHook(args.str("bridgeId", ""))
+                "bridge_ping" -> hooked.bridgePingHook(args.str("bridgeId", ""))
                 else -> err("UNKNOWN_ACTION", "Unknown action: ${args.str("action")}", "action", args.str("action"))
             }
         }

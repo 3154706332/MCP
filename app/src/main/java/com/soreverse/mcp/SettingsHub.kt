@@ -58,7 +58,7 @@ private fun settingsTitle(t: UiText, dest: SettingsDest): String = when (dest) {
     SettingsDest.Audit -> if (t.zh) "编辑校验与审计" else "Edit & Audit"
     SettingsDest.Blutter -> "Blutter"
     SettingsDest.Tunnel -> if (t.zh) "Cloudflare 隧道" else "Cloudflare Tunnel"
-    SettingsDest.ApkBridge -> if (t.zh) "APK MCP 桥接" else "APK MCP Bridge"
+    SettingsDest.BridgeRegistry -> if (t.zh) "MCP 桥接注册表" else "MCP Bridge Registry"
     SettingsDest.AiDeep -> if (t.zh) "AI 深度分析" else "AI Deep Analysis"
     SettingsDest.Updates -> if (t.zh) "版本更新" else "Software Update"
     SettingsDest.Probe -> t.externalProbe
@@ -162,7 +162,7 @@ internal fun SettingsHub(
                     SettingsTile(if (t.zh) "保活" else "Keep-alive", if (t.zh) "唤醒锁 / 自启" else "Wake lock / boot", Icons.Default.PowerSettingsNew, AppPalette.green, { onDest(SettingsDest.KeepAlive) }, Modifier.weight(1f))
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SettingsTile("APK MCP", if (t.zh) "MT 管理器协同" else "MT Manager bridge", Icons.Default.Link, AppPalette.orange, { onDest(SettingsDest.ApkBridge) }, Modifier.weight(1f))
+                    SettingsTile("MCP Bridges", if (t.zh) "多 MCP 服务器协同" else "Multi-MCP server coordination", Icons.Default.Link, AppPalette.orange, { onDest(SettingsDest.BridgeRegistry) }, Modifier.weight(1f))
                     SettingsTile(if (t.zh) "隧道" else "Tunnel", if (t.zh) "公网暴露 / 保活" else "Public expose", Icons.Default.Cloud, AppPalette.purple, { onDest(SettingsDest.Tunnel) }, Modifier.weight(1f))
                 }
                 Text(if (t.zh) "引擎" else "Engine", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
@@ -219,7 +219,7 @@ internal fun SettingsHub(
             SettingsDest.Audit -> SettingsAuditPage(t, settings)
             SettingsDest.Blutter -> SettingsBlutterPage(t)
             SettingsDest.Tunnel -> SettingsTunnelPage(t, settings)
-            SettingsDest.ApkBridge -> SettingsApkBridgePage(t, settings)
+            SettingsDest.BridgeRegistry -> SettingsBridgeRegistryPage(t, settings)
             SettingsDest.AiDeep -> SettingsAiDeepPage(t, settings)
             SettingsDest.Updates -> SettingsUpdatesPage(t, settings, updateManager, availableRelease, onRelease)
             SettingsDest.Probe -> SettingsProbePage(t, settings)

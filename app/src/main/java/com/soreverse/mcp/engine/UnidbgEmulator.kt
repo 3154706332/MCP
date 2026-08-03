@@ -306,6 +306,39 @@ class UnidbgEmulator(private val context: Context) {
                     .put("prot", prot)
                     .put("permissions", memoryProt(prot)))
             }
+            // Try to add stack mapping based on SP register
+            try {
+                val context = live.emulator.javaClass.getMethod("getContext").invoke(live.emulator)
+                val spMethod = context.javaClass.methods.firstOrNull { it.name == "getStackPointer" && it.parameterCount == 0 }
+                spMethod?.let { spValMethod ->
+                    val sp = (spValMethod.invoke(context) as? Number)?.toLong() ?: 0L
+                    if (sp != 0L) {
+                        // Check if SP is already covered by existing maps
+                        val spCovered = maps.any { map ->
+                            map != null && runCatching {
+                                val cls = map.javaClass
+                                val base = cls.getField("base").getLong(map)
+                                val size = cls.getField("size").getLong(map)
+                                sp in base until (base + size)
+                            }.getOrDefault(false)
+                        }
+                        if (!spCovered) {
+                            // Add a default stack mapping (1MB)
+                            val stackBase = sp - 0x100000
+                            val stackSize = 0x200000L
+                            items.put(JSONObject()
+                                .put("base", "0x${stackBase.toString(16)}")
+                                .put("end", "0x${(stackBase + stackSize).toString(16)}")
+                                .put("size", stackSize)
+                                .put("prot", 3) // rw-
+                                .put("permissions", "rw-")
+                                .put("type", "stack"))
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                // Ignore if we can't get SP
+            }
             JSONObject().put("ok", true).put("persistent", true).put("addressSpace", "runtimeAbsoluteVirtualAddress").put("memoryMaps", items)
         }
     }.getOrElse { e -> JSONObject().put("ok", false).put("error", JSONObject().put("code", "MEMORY_MAP_ERROR").put("message", rootCause(e).message ?: e.javaClass.simpleName)) }
@@ -392,10 +425,21 @@ class UnidbgEmulator(private val context: Context) {
 
     fun sessionTraceCode(live: LiveSession, begin: Long, end: Long): JSONObject = runCatching {
         synchronized(live.lock) {
-            val method = live.emulator.javaClass.methods.firstOrNull { it.name == "traceCode" && it.parameterCount == 2 }
-                ?: return@runCatching JSONObject().put("ok", false).put("error", JSONObject().put("code", "TRACE_UNAVAILABLE").put("message", "traceCode(begin,end) not available"))
-            val hook = method.invoke(live.emulator, begin, end)
-            JSONObject().put("ok", true).put("persistent", true).put("trace", "code").put("begin", "0x${begin.toString(16)}").put("end", "0x${end.toString(16)}").put("hook", hook?.javaClass?.name ?: JSONObject.NULL)
+            val listenerClass = Class.forName("com.github.unidbg.listener.TraceCodeListener")
+            val listener = java.lang.reflect.Proxy.newProxyInstance(listenerClass.classLoader, arrayOf(listenerClass)) { _, method, callbackArgs ->
+                val values = callbackArgs ?: emptyArray()
+                val event = JSONObject().put("index", live.traceEvents.size).put("type", "code").put("method", method.name).put("timestamp", System.currentTimeMillis())
+                if (values.size > 1 && values[1] is Number) event.put("address", "0x${(values[1] as Number).toLong().toString(16)}")
+                if (values.size > 2) event.put("instruction", values[2]?.toString() ?: JSONObject.NULL)
+                if (live.traceEvents.size >= 100000) live.traceEvents.removeAt(0)
+                live.traceEvents.add(event)
+                method.returnType == Boolean::class.javaPrimitiveType
+            }
+            val method = live.emulator.javaClass.methods.first { it.name == "traceCode" && it.parameterCount == 3 && it.parameterTypes[2] == listenerClass }
+            val hook = method.invoke(live.emulator, begin, end, listener) ?: throw IllegalStateException("Trace hook unavailable")
+            val traceId = "trace-code-${live.traceHooks.size + 1}"
+            live.traceHooks[traceId] = hook
+            JSONObject().put("ok", true).put("persistent", true).put("traceId", traceId).put("trace", "code").put("begin", "0x${begin.toString(16)}").put("end", "0x${end.toString(16)}").put("hook", hook?.javaClass?.name ?: JSONObject.NULL)
         }
     }.getOrElse { e -> JSONObject().put("ok", false).put("error", JSONObject().put("code", "TRACE_ERROR").put("message", rootCause(e).message ?: e.javaClass.simpleName)) }
 
@@ -540,8 +584,17 @@ class UnidbgEmulator(private val context: Context) {
     fun sessionSingleStep(live: LiveSession, count: Int): JSONObject = runCatching {
         synchronized(live.lock) {
             val backend = live.backend ?: throw IllegalStateException("Backend unavailable")
+            val emulator = live.emulator
+            // Set single step mode and execute
             backend.javaClass.methods.first { it.name == "setSingleStep" && it.parameterCount == 1 }.invoke(backend, count.coerceAtLeast(1))
-            JSONObject().put("ok", true).put("persistent", true).put("singleStepCount", count.coerceAtLeast(1))
+            // Execute the step(s)
+            val stepMethod = emulator.javaClass.methods.firstOrNull { it.name == "step" && it.parameterCount == 0 }
+                ?: emulator.javaClass.methods.firstOrNull { it.name == "execute" && it.parameterCount == 0 }
+            stepMethod?.invoke(emulator)
+            // Return new register state
+            val context = emulator.javaClass.getMethod("getContext").invoke(emulator) ?: throw IllegalStateException("Register context unavailable")
+            val values = if (live.arch == "arm64" || live.arch == "x86_64") readArm64Context(context) else readArm32Context(context)
+            JSONObject().put("ok", true).put("persistent", true).put("singleStepCount", count.coerceAtLeast(1)).put("registers", values)
         }
     }.getOrElse { e -> JSONObject().put("ok", false).put("error", JSONObject().put("code", "SINGLE_STEP_ERROR").put("message", rootCause(e).message ?: e.javaClass.simpleName)) }
 
@@ -816,7 +869,7 @@ class UnidbgEmulator(private val context: Context) {
         val getXLong = context.javaClass.methods.firstOrNull { it.name == "getXLong" && it.parameterCount == 1 }
         for (i in 0..28) {
             runCatching { getXLong?.invoke(context, i) }
-                .onSuccess { values.put("x$i", it?.toString() ?: "0") }
+                .onSuccess { values.put("x$i", if (it is Number) "0x${it.toLong().toString(16)}" else it?.toString() ?: "0x0") }
                 .onFailure { values.put("x$i", JSONObject().put("error", rootCause(it).message ?: it.javaClass.simpleName)) }
         }
         listOf("getFp" to "fp", "getLR" to "lr", "getStackPointer" to "sp", "getPCPointer" to "pc").forEach { (methodName, name) ->
@@ -832,7 +885,7 @@ class UnidbgEmulator(private val context: Context) {
         for (i in 0..12) {
             val methodName = "getR${i}Long"
             runCatching { context.javaClass.methods.firstOrNull { it.name == methodName && it.parameterCount == 0 }?.invoke(context) }
-                .onSuccess { values.put("r$i", it?.toString() ?: "0") }
+                .onSuccess { values.put("r$i", if (it is Number) "0x${it.toLong().toString(16)}" else it?.toString() ?: "0x0") }
                 .onFailure { values.put("r$i", JSONObject().put("error", rootCause(it).message ?: it.javaClass.simpleName)) }
         }
         listOf("getLR" to "lr", "getStackPointer" to "sp", "getPCPointer" to "pc").forEach { (methodName, name) ->
@@ -844,9 +897,12 @@ class UnidbgEmulator(private val context: Context) {
     }
 
     private fun pointerValue(value: Any?): String = when (value) {
-        null -> "0"
-        is Number -> value.toString()
-        else -> runCatching { value.javaClass.getMethod("peer").invoke(value)?.toString() }.getOrNull() ?: value.toString()
+        null -> "0x0"
+        is Number -> "0x${value.toLong().toString(16)}"
+        else -> runCatching {
+            val peer = value.javaClass.getMethod("peer").invoke(value)
+            if (peer is Number) "0x${peer.toLong().toString(16)}" else peer?.toString() ?: "0x0"
+        }.getOrElse { value.toString().let { if (it.startsWith("unidbg@")) it.substringAfter("unidbg@") else it } }
     }
 
     private fun moduleJson(module: Any): JSONObject {

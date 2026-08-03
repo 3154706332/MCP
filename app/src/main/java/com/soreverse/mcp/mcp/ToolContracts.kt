@@ -113,7 +113,7 @@ class HookedContext(
     val tunnelStatsHook: (Boolean) -> JSONObject,
     val tunnelStartHook: (String, Int, String) -> JSONObject,
     val tunnelStopHook: () -> JSONObject,
-    val apkStatusHook: (Boolean) -> JSONObject,
-    val apkProbeHook: () -> JSONObject,
-    val apkPingHook: () -> JSONObject,
+    val bridgeStatusHook: (Boolean) -> JSONObject,
+    val bridgeProbeHook: (String) -> JSONObject,
+    val bridgePingHook: (String) -> JSONObject,
 ) : ToolContext(context, settings, engine)

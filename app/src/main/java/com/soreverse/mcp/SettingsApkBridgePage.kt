@@ -18,23 +18,67 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.soreverse.mcp.core.ApkMcpBridge
+import com.soreverse.mcp.core.McpBridgeRegistry
 import com.soreverse.mcp.core.SettingsStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/**
+ * Legacy APK Bridge settings page - now syncs with the new McpBridgeRegistry
+ * for the "mt_manager_apk" bridge. Kept for backward compatibility.
+ */
 @Composable
 internal fun SettingsApkBridgePage(t: UiText, settings: SettingsStore) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val registry = remember { McpBridgeRegistry(context.applicationContext, settings) }
+
+    // Initialize registry on first load
+    val initialized = remember { mutableStateOf(false) }
+    if (!initialized.value) {
+        registry.loadFromSettings()
+        initialized.value = true
+    }
+
+    val mtBridge = registry.getBridge("mt_manager_apk")
     var apkUrl by remember { mutableStateOf(settings.apkMcpUrl) }
     var apkToken by remember { mutableStateOf(settings.apkMcpToken) }
     var apkAutoProbe by remember { mutableStateOf(settings.apkMcpAutoProbe) }
     var apkMerge by remember { mutableStateOf(settings.apkMcpMergeTools) }
-    var probeState by remember { mutableStateOf<ApkMcpBridge.State?>(null) }
+    var probeState by remember { mutableStateOf<McpBridgeRegistry.BridgeState?>(null) }
+
+    // Sync with registry when bridge state changes
+    val registryListener = remember {
+        object : McpBridgeRegistry.OnBridgeChangeListener {
+            override fun onBridgeAdded(bridgeId: String) {}
+            override fun onBridgeRemoved(bridgeId: String) {}
+            override fun onBridgeStateChanged(bridgeId: String, online: Boolean) {
+                if (bridgeId == "mt_manager_apk") {
+                    probeState = registry.getBridge(bridgeId)?.getState()
+                }
+            }
+            override fun onBridgeToolsChanged(bridgeId: String) {
+                if (bridgeId == "mt_manager_apk") {
+                    probeState = registry.getBridge(bridgeId)?.getState()
+                }
+            }
+        }
+    }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        registry.addListener(registryListener)
+        onDispose { registry.removeListener(registryListener) }
+    }
+
     PageScroll {
         GlassGroup {
+            Text(
+                if (t.zh) "⚠️ 此页面为兼容模式，建议使用「MCP 桥接注册表」管理多 MCP 服务器"
+                else "⚠️ This page is legacy; use \"MCP Bridge Registry\" for multi-MCP management",
+                modifier = Modifier.padding(14.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.tertiary,
+            )
             OutlinedTextField(
                 value = apkUrl,
                 onValueChange = { apkUrl = it; settings.apkMcpUrl = it },
@@ -82,15 +126,28 @@ internal fun SettingsApkBridgePage(t: UiText, settings: SettingsStore) {
                     if (t.zh) "立即探测" else "Probe now",
                     {
                         scope.launch {
-                            val bridge = activeBridge(context.applicationContext)
-                            probeState = withContext(Dispatchers.IO) { bridge.probe() }
+                            val bridge = mtBridge ?: run {
+                            registry.addBridge(McpBridgeRegistry.BridgeConfig(
+                                id = "mt_manager_apk",
+                                name = "MT Manager APK MCP",
+                                url = apkUrl,
+                                token = apkToken.takeIf { it.isNotBlank() },
+                                namespace = "mt_apk",
+                                enabled = true,
+                                autoConnect = apkAutoProbe,
+                            ))
+                            registry.getBridge("mt_manager_apk")
+                        }
+                        if (bridge != null) {
+                            probeState = withContext(Dispatchers.IO) { bridge.healthCheck() }
+                        }
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
             probeState?.let {
-                val color = if (it.online) AppleColors.systemGreen else AppleColors.systemRed
+                val color = if (it.online) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
                 Text(
                     "${if (t.zh) "状态" else "State"}: ${if (it.online) (if (t.zh) "在线" else "online") else (if (t.zh) "离线" else "offline")}   ${if (t.zh) "工具数" else "tools"}: ${it.tools.size}",
                     color = color,

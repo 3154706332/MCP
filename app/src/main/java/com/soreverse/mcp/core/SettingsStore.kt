@@ -434,7 +434,12 @@ class SettingsStore(context: Context) {
         get() = prefs.getString("tunnelLogLevel", "info") ?: "info"
         set(value) = prefs.edit().putString("tunnelLogLevel", if (value in setOf("debug", "info", "warn", "error", "fatal")) value else "info").apply()
 
-    // ---- APK MCP bridge ----
+    // ---- MCP Bridge Registry (supports multiple MCP servers) ----
+    var mcpBridgesJson: String
+        get() = prefs.getString("mcpBridgesJson", "") ?: ""
+        set(value) = prefs.edit().putString("mcpBridgesJson", value).apply()
+
+    // Legacy APK MCP bridge settings (kept for migration)
     var apkMcpUrl: String
         get() = prefs.getString("apkMcpUrl", "") ?: ""
         set(value) = prefs.edit().putString("apkMcpUrl", value.trim()).apply()
@@ -595,7 +600,8 @@ class SettingsStore(context: Context) {
                 .put("tunnelKeepaliveIntervalSec", tunnelKeepaliveIntervalSec)
                 .put("tunnelReconnectBackoffSec", tunnelReconnectBackoffSec)
                 .put("tunnelLogLevel", tunnelLogLevel))
-            .put("apkBridge", org.json.JSONObject()
+            .put("mcpBridges", mcpBridgesJson)
+            .put("legacyApkBridge", org.json.JSONObject()
                 .put("apkMcpUrl", apkMcpUrl)
                 .put("apkMcpToken", mask(apkMcpToken))
                 .put("apkMcpAutoProbe", apkMcpAutoProbe)
@@ -719,12 +725,17 @@ class SettingsStore(context: Context) {
         applyInt(tunnel, "tunnelReconnectBackoffSec") { tunnelReconnectBackoffSec = it }
         applyStr(tunnel, "tunnelLogLevel") { tunnelLogLevel = it }
 
-        val apk = obj("apkBridge") ?: patch
-        applyStr(apk, "apkMcpUrl") { apkMcpUrl = it }
-        if (allowSecrets) applyStr(apk, "apkMcpToken") { apkMcpToken = it }
-        applyBool(apk, "apkMcpAutoProbe") { apkMcpAutoProbe = it }
-        applyBool(apk, "apkMcpMergeTools") { apkMcpMergeTools = it }
-        applyInt(apk, "apkMcpProbeTimeoutMs") { apkMcpProbeTimeoutMs = it }
+        val legacyApk = obj("legacyApkBridge") ?: obj("apkBridge") ?: patch
+        applyStr(legacyApk, "apkMcpUrl") { apkMcpUrl = it }
+        if (allowSecrets) applyStr(legacyApk, "apkMcpToken") { apkMcpToken = it }
+        applyBool(legacyApk, "apkMcpAutoProbe") { apkMcpAutoProbe = it }
+        applyBool(legacyApk, "apkMcpMergeTools") { apkMcpMergeTools = it }
+        applyInt(legacyApk, "apkMcpProbeTimeoutMs") { apkMcpProbeTimeoutMs = it }
+
+        val mcpBridges = obj("mcpBridges")
+        if (mcpBridges != null && mcpBridges != patch) {
+            applyStr(patch, "mcpBridgesJson") { mcpBridgesJson = it }
+        }
 
         // Flat key support for AI convenience: app_config set key=value
         val flatKeys = listOf(

@@ -58,7 +58,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.soreverse.mcp.core.ApkMcpBridge
+import com.soreverse.mcp.core.McpBridgeRegistry
 import com.soreverse.mcp.core.AppLog
 import com.soreverse.mcp.core.CloudflareTunnelManager
 import com.soreverse.mcp.core.EngineProvider
@@ -104,12 +104,15 @@ internal fun ServiceTab(
     LaunchedEffect(Unit) {
         treeUri?.let { EngineProvider.get(context).setWorkDirectory(it) }
         apkConnected = withContext(Dispatchers.IO) {
-            val bridge = activeBridge(context)
-            when {
-                settings.apkMcpUrl.isNotBlank() -> bridge.probe().online
-                settings.apkMcpAutoProbe -> bridge.autoDiscover(ApkMcpBridge.DEFAULT_PORT).online
-                else -> false
-            }
+            val registry = McpBridgeRegistry(context.applicationContext, settings)
+            registry.loadFromSettings()
+            registry.getBridge("mt_manager_apk")?.let { bridge ->
+                when {
+                    settings.apkMcpUrl.isNotBlank() -> bridge.healthCheck().online
+                    settings.apkMcpAutoProbe -> bridge.connect().online
+                    else -> false
+                }
+            } ?: false
         }
         while (true) {
             running = McpForegroundService.isRunning()
@@ -120,18 +123,20 @@ internal fun ServiceTab(
             val ts = activeServer(context)?.tunnel?.status()
             val url = ts?.publicUrl?.takeIf { it.isNotBlank() && ts.state == CloudflareTunnelManager.State.RUNNING }
             if (url != quickPublicUrl) quickPublicUrl = url
-            val liveBridge = activeServer(context)?.apkBridge
-            val bridgeState = liveBridge?.state()
+            val server = activeServer(context)
+            val registry = server?.bridgeRegistry
+            val bridgeState = registry?.getBridge("mt_manager_apk")?.getState()
             apkToolNames = bridgeState?.tools?.map { it.name }.orEmpty()
             if (bridgeState?.online == true) {
                 apkConnected = true
             } else if (settings.apkMcpAutoProbe) {
                 apkConnected = withContext(Dispatchers.IO) {
-                    val bridge = activeBridge(context)
-                    val result = if (settings.apkMcpUrl.isNotBlank()) bridge.probe() else bridge.autoDiscover(ApkMcpBridge.DEFAULT_PORT)
-                    result.online
+                    val reg = McpBridgeRegistry(context.applicationContext, settings)
+                    reg.loadFromSettings()
+                    val bridge = reg.getBridge("mt_manager_apk")
+                    bridge?.healthCheck().online ?: false
                 }
-            } else if (liveBridge != null || settings.apkMcpUrl.isBlank()) {
+            } else if (server != null || settings.apkMcpUrl.isBlank()) {
                 apkConnected = false
             }
             keepAliveReady = isKeepAliveReady(context, settings)

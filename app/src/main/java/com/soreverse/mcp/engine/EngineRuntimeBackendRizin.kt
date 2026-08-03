@@ -365,17 +365,6 @@ internal fun EngineRuntime.rzDiff(workspaceIdA: String, editSessionIdA: String, 
     if (!NativeEngine.active().available()) return@guarded err("RIZIN_UNAVAILABLE", "Rizin native backend not loaded for this ABI")
     val bytesA = dataFor(workspaceIdA, editSessionIdA)
     val bytesB = dataFor(workspaceIdB, editSessionIdB)
-    if (maxOf(bytesA.size, bytesB.size) <= 1024 * 1024) {
-        val ranges = PatchByteUtils.byteDiffRanges(bytesA, bytesB)
-        return@guarded ok(JSONObject()
-            .put("workspaceIdA", workspaceIdA)
-            .put("workspaceIdB", workspaceIdB)
-            .put("diffBackend", "fast-byte-diff")
-            .put("diffRangeCount", ranges.length())
-            .put("diffRanges", ranges)
-            .put("sha256A", sha256(bytesA))
-            .put("sha256B", sha256(bytesB)))
-    }
     val result = NativeEngine.active().diff(bytesA, bytesB)
     ok(JSONObject(result).put("workspaceIdA", workspaceIdA).put("workspaceIdB", workspaceIdB).put("diffBackend", "rizin"))
 }
