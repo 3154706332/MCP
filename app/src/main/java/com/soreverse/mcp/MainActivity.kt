@@ -409,7 +409,7 @@ private fun SoReverseApp() {
                                     settings = settings,
                                     onOpenApkBridge = {
                                         tab = MainTab.Settings
-                                        settingsDest = SettingsDest.ApkBridge
+                                        settingsDest = SettingsDest.BridgeRegistry
                                     },
                                     onOpenKeepAlive = {
                                         tab = MainTab.Settings

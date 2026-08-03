@@ -83,7 +83,7 @@ class McpHttpServer(private val context: Context, private val port: Int, private
         AppLog.i("heavy tool gate permits=$p")
     }
 
-    private val bridgeRegistry: McpBridgeRegistry by lazy { McpBridgeRegistry(context, SettingsStore(context)).also { it.loadFromSettings() } }
+    val bridgeRegistry: McpBridgeRegistry by lazy { McpBridgeRegistry(context, SettingsStore(context)).also { it.loadFromSettings() } }
     val tunnel: CloudflareTunnelManager get() = tunnelHolder ?: CloudflareTunnelManager(context, SettingsStore(context)).also { tunnelHolder = it }
     private var tunnelHolder: CloudflareTunnelManager? = null
 

@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.background
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -194,7 +195,7 @@ internal fun SettingsBridgeRegistryPage(t: UiText, settings: SettingsStore) {
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 Text(
-                                    "${if (t.zh) "延迟" else "Latency"}: ${state.lastLatencyMs}ms  •  ${if (t.zh) "丢包" else "Loss"}: ${"%.1f".format(state.lossRate() * 100)}%",
+                                    "${if (t.zh) "延迟" else "Latency"}: ${state.lastLatencyMs}ms  •  ${if (t.zh) "丢包" else "Loss"}: ${if (state.probeFailures > 0) "%.1f%%".format(state.probeFailures.toFloat() / maxOf(state.probes, 1) * 100) else "0.0%"}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
