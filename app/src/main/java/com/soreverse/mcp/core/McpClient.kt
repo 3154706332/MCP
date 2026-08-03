@@ -58,8 +58,8 @@ class McpClient(
 
     private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(connectTimeoutSec, TimeUnit.SECONDS)
-            .readTimeout(readTimeoutSec, TimeUnit.SECONDS)
+            .connectTimeout(connectTimeoutSec.toLong(), TimeUnit.SECONDS)
+            .readTimeout(readTimeoutSec.toLong(), TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .build()
     }
