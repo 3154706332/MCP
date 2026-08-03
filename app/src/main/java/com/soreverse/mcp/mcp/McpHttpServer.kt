@@ -84,7 +84,7 @@ class McpHttpServer(private val context: Context, private val port: Int, private
     }
 
     private val bridgeRegistry: McpBridgeRegistry by lazy { McpBridgeRegistry(context, SettingsStore(context)).also { it.loadFromSettings() } }
-    private val tunnel: CloudflareTunnelManager get() = tunnelHolder ?: CloudflareTunnelManager(context, SettingsStore(context)).also { tunnelHolder = it }
+    val tunnel: CloudflareTunnelManager get() = tunnelHolder ?: CloudflareTunnelManager(context, SettingsStore(context)).also { tunnelHolder = it }
     private var tunnelHolder: CloudflareTunnelManager? = null
 
     fun ensureBridgesProbed() {
@@ -442,7 +442,7 @@ class McpHttpServer(private val context: Context, private val port: Int, private
         val payload = if (handler != null) {
             handler.handle(ctx, args)
         } else if (bridgeRegistry.isBridgedTool(name)) {
-            bridgeRegistry.callBridgedTool(name, args)
+            bridgeRegistry.callBridgedTool(name, args) ?: JSONObject().put("ok", false).put("error", JSONObject().put("code", "BRIDGE_CALL_FAILED").put("message", name))
         } else {
             JSONObject().put("ok", false).put("error", JSONObject().put("code", "TOOL_NOT_FOUND").put("message", name))
         }
@@ -550,7 +550,7 @@ class McpHttpServer(private val context: Context, private val port: Int, private
             .put("bridges", JSONArray(bridgeSnapshots))
             .put("tunnel", tunnel.snapshotJson())
             .put("integration", JSONObject()
-                .put("legacyApkMcpOnline", legacyApkBridge?.getState().online == true)
+                .put("legacyApkMcpOnline", legacyApkBridge?.getState()?.online == true)
                 .put("legacyApkMcpUrl", s.apkMcpUrl)
                 .put("hint", if (bridgeRegistry.getEnabledBridges().any { it.getState().online }) "MCP bridges are online. Use bridged tools with namespace prefixes (e.g., mt_apk_open, ext_...). Use system_control (action=bridge_probe, bridgeId=...) to refresh." else "No MCP bridges online. Add bridges in settings or start MT Manager's APK MCP, then call system_control (action=bridge_probe)."))
             .put("cloudflaredAvailable", tunnel.binary()?.exists() == true)
