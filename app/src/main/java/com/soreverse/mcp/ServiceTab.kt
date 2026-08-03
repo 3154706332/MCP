@@ -134,7 +134,7 @@ internal fun ServiceTab(
                     val reg = McpBridgeRegistry(context.applicationContext, settings)
                     reg.loadFromSettings()
                     val bridge = reg.getBridge("mt_manager_apk")
-                    bridge?.healthCheck().online ?: false
+                    bridge?.healthCheck()?.online ?: false
                 }
             } else if (server != null || settings.apkMcpUrl.isBlank()) {
                 apkConnected = false
