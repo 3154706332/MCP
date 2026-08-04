@@ -19,7 +19,7 @@ import com.max.mcp.core.SettingsStore
 import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsBridgeRegistryPage(t: UiText, settings: SettingsStore) {
+internal fun SettingsBridgeRegistryPage(t: UiText, settings: SettingsStore) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val registry = remember { McpBridgeRegistry(context.applicationContext, settings) }
