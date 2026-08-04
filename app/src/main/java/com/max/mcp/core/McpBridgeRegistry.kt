@@ -44,7 +44,6 @@ class McpBridgeRegistry(private val context: android.content.Context, private va
                 lastError = st.lastError, tools = st.tools)
         }
         fun listTools() = client.listTools()
-        fun callTool(name: String, args: JSONObject) = client.callTool(name, args) // stub
     }
 
     private fun persistBridges() {
