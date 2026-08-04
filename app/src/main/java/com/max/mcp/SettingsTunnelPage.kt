@@ -10,7 +10,7 @@ import com.max.mcp.core.SettingsStore
 import com.max.mcp.core.CloudflareTunnelManager
 
 @Composable
-fun SettingsTunnelPage(t: UiText, settings: SettingsStore) {
+internal fun SettingsTunnelPage(t: UiText, settings: SettingsStore) {
     PageScroll {
         Text(t.tunnel, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(16.dp))
 
