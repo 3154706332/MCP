@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.max.mcp.core.SettingsStore
 import com.max.mcp.service.McpForegroundService
 import kotlinx.coroutines.delay
+import androidx.compose.ui.unit.dp
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
