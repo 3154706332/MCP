@@ -67,7 +67,7 @@ fun McpLiteApp() {
 }
 
 @Composable
-fun LiteServiceTab(settings: SettingsStore, t: UiText) {
+internal fun LiteServiceTab(settings: SettingsStore, t: UiText) {
     val context = LocalContext.current
     var running by remember { mutableStateOf(false) }
     var tunnelUrl by remember { mutableStateOf("") }
