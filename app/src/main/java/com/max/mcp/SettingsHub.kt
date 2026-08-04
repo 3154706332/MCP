@@ -19,7 +19,7 @@ import com.max.mcp.core.SettingsStore
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsHub(t: UiText, settings: SettingsStore) {
+internal fun SettingsHub(t: UiText, settings: SettingsStore) {
     var dest by remember { mutableStateOf(SettingsDest.Root) }
 
     if (dest != SettingsDest.Root) {
