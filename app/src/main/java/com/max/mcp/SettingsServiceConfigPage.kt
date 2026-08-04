@@ -9,7 +9,7 @@ import androidx.compose.ui.unit.dp
 import com.max.mcp.core.SettingsStore
 
 @Composable
-fun SettingsServiceConfigPage(t: UiText, settings: SettingsStore) {
+internal fun SettingsServiceConfigPage(t: UiText, settings: SettingsStore) {
     PageScroll {
         Text(t.service, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(16.dp))
 
